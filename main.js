@@ -8,18 +8,21 @@ var fnMain = (function() {
     }
 
     function getConfig() {
-        let palette = ['#FFCDDD', '#FFC61A', '#E20167', '#0394E7', '#020607', '#FFCDDD', '#FFC61A', '#E20167'];
+        const palette = ['#0F694D', '#520CC2', '#D8C026', '#14F7E2']
         return {
-            numShapes: 50,
+            numShapes: 30,
             nSides: 3,
-            shapeRadius: 0.35,
-            shapeHolePercent: 0.99,
-            spinDuration: 5000,
-            spinOffset: 0.6,
-            spinEasing: 'easeInExpo',
-            screenMargin: 0.04, //percent on each edge not included in 'board' rectangle
+            shapeRadius: 0.44,
+            shapeHolePercent: 0.75,
+            spinDuration: 4000,
+            spinOffset: 0.7,
+            spinEasing: 'easeOutQuad',
+            screenMargin: 0.03, //percent on each edge not included in 'board' rectangle
             colorScale: chroma.scale(palette).mode('lch'), //modes: lch, lab, hsl, rgb
+            shapeAlpha: 1,
+            shapeBlendMode: PIXI.BLEND_MODES.ADD,
             palette: palette,
+            //backgroundColor: 0xFFFFFF,
             backgroundColor: 0x0,
         };
     }
@@ -50,10 +53,10 @@ var fnMain = (function() {
         return result;
     }
 
-    function drawNSideRegular(graphics, nSides, centerX, centerY, radius, color24) {
-        graphics.beginFill(color24);
+    function drawNSideRegular(graphics, nSides, centerX, centerY, radius, color24, alpha) {
+        graphics.beginFill(color24, alpha);
         const points = makeRange(nSides).map((x,i) => {
-            const fixedRotation = -0.25;
+            const fixedRotation = 0.25;
             const amountAround = i / nSides + fixedRotation;
             const vx = radius * Math.cos(Math.PI * 2 * amountAround) + centerX;
             const vy = radius * Math.sin(Math.PI * 2 * amountAround) + centerY;
@@ -71,16 +74,16 @@ var fnMain = (function() {
             const diameter = config.shapeRadius * 2;
             g.width = diameter;
             g.height = diameter;
-            const color = RGBTo24bit(config.colorScale(Math.random()).rgb());
-            drawNSideRegular(g, config.nSides, config.shapeRadius, config.shapeRadius, config.shapeRadius, color);
-            drawNSideRegular(g, config.nSides, config.shapeRadius, config.shapeRadius, config.shapeRadius * config.shapeHolePercent, config.backgroundColor);
+            const color = RGBTo24bit(config.colorScale((i / (config.numShapes - 1))).rgb());
+            drawNSideRegular(g, config.nSides, config.shapeRadius, config.shapeRadius, config.shapeRadius, color, config.shapeAlpha);
+            drawNSideRegular(g, config.nSides, config.shapeRadius, config.shapeRadius, config.shapeRadius * config.shapeHolePercent, config.backgroundColor, 1);
             const texture = PIXI.RenderTexture.create(diameter, diameter);
             renderer.render(g, texture);
             const sprite = new PIXI.Sprite(texture);
-            sprite.x = board.width / 2;
-            sprite.y = board.height / 2;
+            sprite.x = board.width / 2 + board.left;
+            sprite.y = board.height / 2 + board.top;
             sprite.anchor.set(0.5, 0.5);
-            sprite.blendMode = PIXI.BLEND_MODES.ADD;
+            sprite.blendMode = config.shapeBlendMode;
             const shape = {
                 sprite: sprite,
             };
@@ -99,11 +102,12 @@ var fnMain = (function() {
         });
         for(let i = 0; i < shapes.length; i++) {
             const shape = shapes[i];
+            const left = i % 2 == 0 ? -1 : 1;
             timeline.add({
                 targets: shape.sprite,
-                rotation: i % 2 == 0 ? Math.PI * 2 : Math.PI * -2,
+                rotation: Math.PI * 2 * left,
                 easing: config.spinEasing,
-                offset: (i / shapes.length) * (config.spinDuration * config.spinOffset),
+                offset: (Math.floor(i/2) / (shapes.length / 2 - 1)) * (config.spinDuration * config.spinOffset),
                 duration: config.spinDuration,
             });
         }
