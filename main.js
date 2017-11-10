@@ -8,28 +8,31 @@ var fnMain = (function() {
     }
 
     function getConfig() {
-        const palette = ['#0F694D', '#520CC2', '#D8C026', '#14F7E2']
+        const pstring = '#72969D,#DCAD68,#834D6F,cyan';
+        const palette = pstring.split(',');
+        //const palette = ['#0F694D', '#520CC2', '#D8C026', '#14F7E2'];
+        //const palette = ['yellow', 'navy'];
+        //const palette = ['red', 'green', 'blue'];
         return {
-            numShapes: 30,
-            nSides: 3,
+            numShapes: 80,
+            nSides: 4,
             shapeRadius: 0.44,
-            shapeHolePercent: 0.75,
-            spinDuration: 4000,
-            spinOffset: 0.7,
-            spinEasing: 'easeOutQuad',
+            shapeHolePercent: 0.9,
+            spinDuration: 1800,
+            spinOffset: 0.6,
+            spinEasing: 'easeInOutCirc',
             screenMargin: 0.03, //percent on each edge not included in 'board' rectangle
             colorScale: chroma.scale(palette).mode('lch'), //modes: lch, lab, hsl, rgb
             shapeAlpha: 1,
-            shapeBlendMode: PIXI.BLEND_MODES.ADD,
+            shapeBlendMode: PIXI.BLEND_MODES.MULTIPLY,
             palette: palette,
-            //backgroundColor: 0xFFFFFF,
-            backgroundColor: 0x0,
+            backgroundColor: 0xFFFFFF,
         };
     }
 
     function makeBoardRectangle(margin, viewRectangle) {
-        const xmargin = margin * viewRectangle.width;
-        const ymargin = margin * viewRectangle.height;
+        const xmargin = Math.round(margin * viewRectangle.width);
+        const ymargin = Math.round(margin * viewRectangle.height);
         const boardWidth = viewRectangle.width - (xmargin * 2);
         const boardHeight = viewRectangle.height - (ymargin * 2);
         return new PIXI.Rectangle(xmargin, ymargin, boardWidth, boardHeight);
@@ -53,6 +56,10 @@ var fnMain = (function() {
         return result;
     }
 
+    function portion(i, size) {
+        return i / ((size -1) || 1);
+    }
+
     function drawNSideRegular(graphics, nSides, centerX, centerY, radius, color24, alpha) {
         graphics.beginFill(color24, alpha);
         const points = makeRange(nSides).map((x,i) => {
@@ -60,7 +67,7 @@ var fnMain = (function() {
             const amountAround = i / nSides + fixedRotation;
             const vx = radius * Math.cos(Math.PI * 2 * amountAround) + centerX;
             const vy = radius * Math.sin(Math.PI * 2 * amountAround) + centerY;
-            const point = new PIXI.Point(vx, vy);
+            const point = new PIXI.Point(Math.round(vx) + 0.5, Math.round(vy) + 0.5);
             return point;
         });
         graphics.drawPolygon(points);
@@ -74,14 +81,18 @@ var fnMain = (function() {
             const diameter = config.shapeRadius * 2;
             g.width = diameter;
             g.height = diameter;
-            const color = RGBTo24bit(config.colorScale((i / (config.numShapes - 1))).rgb());
+            const color = RGBTo24bit(config.colorScale(i / config.numShapes)
+                .luminance(0.25)
+                .brighten(2)
+                //.saturate(0.25)
+            .rgb());
             drawNSideRegular(g, config.nSides, config.shapeRadius, config.shapeRadius, config.shapeRadius, color, config.shapeAlpha);
             drawNSideRegular(g, config.nSides, config.shapeRadius, config.shapeRadius, config.shapeRadius * config.shapeHolePercent, config.backgroundColor, 1);
             const texture = PIXI.RenderTexture.create(diameter, diameter);
             renderer.render(g, texture);
             const sprite = new PIXI.Sprite(texture);
-            sprite.x = board.width / 2 + board.left;
-            sprite.y = board.height / 2 + board.top;
+            sprite.x = Math.round(board.width / 2) + board.left;
+            sprite.y = Math.round(board.height / 2) + board.top;
             sprite.anchor.set(0.5, 0.5);
             sprite.blendMode = config.shapeBlendMode;
             const shape = {
@@ -102,12 +113,18 @@ var fnMain = (function() {
         });
         for(let i = 0; i < shapes.length; i++) {
             const shape = shapes[i];
-            const left = i % 2 == 0 ? -1 : 1;
+            //const left = i % 2 == 0 ? -1 : 1;
             timeline.add({
                 targets: shape.sprite,
-                rotation: Math.PI * 2 * left,
+                rotation:  Math.PI / config.nSides,
                 easing: config.spinEasing,
-                offset: (Math.floor(i/2) / (shapes.length / 2 - 1)) * (config.spinDuration * config.spinOffset),
+                offset: (1 - portion(i, shapes.length)) * (config.spinDuration * config.spinOffset),
+                duration: config.spinDuration,
+            }).add({
+                targets: shape.sprite,
+                rotation:  Math.PI * 2 / config.nSides,
+                easing: config.spinEasing,
+                offset: (config.spinDuration * config.spinOffset + config.spinDuration) + (1 - portion(i, shapes.length)) * (config.spinDuration * config.spinOffset),
                 duration: config.spinDuration,
             });
         }
@@ -132,7 +149,7 @@ var fnMain = (function() {
 
         let board = makeBoardRectangle(config.screenMargin, app.screen);
         const smaller = board.width < board.height ? board.width : board.height;
-        config.shapeRadius = config.shapeRadius * smaller;
+        config.shapeRadius = Math.round(config.shapeRadius * smaller);
         const shapes = makeShapes(config, board, app.renderer);
         for(let s of shapes) {
             app.stage.addChild(s.sprite);
