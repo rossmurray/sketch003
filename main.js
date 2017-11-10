@@ -143,6 +143,7 @@ var fnMain = (function() {
             autoStart: false,
         });
         app.renderer.backgroundColor = config.backgroundColor;
+        app.renderer.render(app.stage);
         //note: this prevents ticker starting when a listener is added. not when the application starts.
         app.ticker.autoStart = false;
         app.ticker.stop();
